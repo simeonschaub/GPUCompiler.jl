@@ -27,12 +27,17 @@ tree_sitter_spirv_jll = "f0e86581-c468-54df-a4de-3266e11a3c86"
 
 [weakdeps]
 AMDGPU_LLVM_Backend_jll = "cc5c0156-bd05-5a77-8a68-bb0aafb29019"
+Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
 LLVMDowngrader_jll = "f52de702-fb25-5922-94ba-81dd59b07444"
 NVPTX_LLVM_Backend_jll = "ef6e0fe3-e6ef-59c0-bde6-4989574699e0"
+
+[extensions]
+CthulhuExt = "Cthulhu"
 
 [compat]
 AMDGPU_LLVM_Backend_jll = "22"
 CompilerCaching = "0.4"
+Cthulhu = "2, 3"
 ExprTools = "0.1"
 Highlights = "0.6"
 InteractiveUtils = "1"
