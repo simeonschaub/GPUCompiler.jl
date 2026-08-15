@@ -191,6 +191,51 @@ end
     end
 end
 
+@testset "i128 byref kernarg layout matches Julia's" begin
+    # the AMDGPU back-end's datalayout does not specify an alignment for i128, so LLVM
+    # would align it to 8 while Julia aligns Int128 to 16. Julia emits field offsets
+    # from its own layout without padding the LLVM struct type, so a disagreement here
+    # sizes the kernarg slot too small and the runtime never copies the trailing bytes
+    # of the argument (giving silently wrong results on the device).
+    mod = @eval module $(gensym())
+        struct I128Args
+            a::Int64
+            b::Int128
+        end
+
+        function kernel(s::I128Args, out::Ptr{Int128})
+            unsafe_store!(out, s.b)
+            return
+        end
+    end
+
+    # Julia only aligns Int128 to 16 bytes as of 1.12; on older hosts its layout
+    # genuinely differs from the device's and there is nothing to match.
+    if Base.datatype_alignment(Int128) == 16
+        job, _ = GCN.create_job(mod.kernel, Tuple{mod.I128Args, Ptr{Int128}}; kernel=true)
+        JuliaContext() do ctx
+            ir, meta = GPUCompiler.compile(:llvm, job)
+            dl = datalayout(ir)
+
+            byref_kind = LLVM.API.LLVMGetEnumAttributeKindForName("byref", 5)
+            byref_types = LLVMType[]
+            for i in 1:length(parameters(function_type(meta.entry)))
+                for attr in collect(parameter_attributes(meta.entry, i))
+                    if attr isa TypeAttribute && kind(attr) == byref_kind
+                        push!(byref_types, value(attr))
+                    end
+                end
+            end
+            @test length(byref_types) == 1
+
+            @test sizeof(dl, only(byref_types)) == sizeof(mod.I128Args)
+            @test offsetof(dl, only(byref_types), 1) == fieldoffset(mod.I128Args, 2)
+
+            dispose(ir)
+        end
+    end
+end
+
 @testset "https://github.com/JuliaGPU/AMDGPU.jl/issues/846" begin
     ir, rt = GCN.code_typed((Tuple{Tuple{Val{4}}, Tuple{Float32}},); always_inline=true) do t
         t[1]

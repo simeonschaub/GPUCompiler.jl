@@ -36,6 +36,32 @@ function llvm_machine(target::GCNCompilerTarget)
     return tm
 end
 
+# the AMDGPU back-end's datalayout (computeAMDDataLayout) does not specify an alignment
+# for i128, so LLVM falls back to the i64:64 entry and gives it an ABI alignment of 8.
+# Julia aligns Int128 to 16 (as does Clang's AMDGPU target, which leaves `Int128Align`
+# at its 128-bit default), and emits field offsets computed from its own layout without
+# inserting explicit padding into the LLVM struct type. Aggregates containing an Int128
+# are therefore laid out differently by the two, which notably breaks `byref` kernel
+# arguments: their kernarg slot is sized from the datalayout, so trailing bytes of the
+# Julia object never make it into the kernarg segment.
+#
+# only the i128 entry is overridden here; everything else is taken from the target so
+# that we stay in sync with whichever LLVM we are running against.
+#
+# NOTE: this only fixes the `:inprocess` back-end. the `:external` back-end runs `llc`,
+#       which discards the module datalayout and recomputes it from the target, so it
+#       needs the corresponding fix in LLVM's `computeAMDDataLayout` to be present in
+#       AMDGPU_LLVM_Backend_jll.
+#
+# as with PTX, Julia did not align Int128 to 16 bytes before 1.12, so on such hosts
+# kernel argument layouts will differ between host and device (users may have to
+# reject affected types).
+function llvm_datalayout(target::GCNCompilerTarget)
+    tm = llvm_machine(target)
+    tm === nothing && return nothing
+    string(DataLayout(tm)) * "-i128:128"
+end
+
 
 ## job
 
