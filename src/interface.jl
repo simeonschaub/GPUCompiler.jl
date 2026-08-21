@@ -367,6 +367,11 @@ runtime_module(@nospecialize(job::CompilerJob)) = error("Not implemented")
 # check if a function is an intrinsic that can assumed to be always available
 isintrinsic(@nospecialize(job::CompilerJob), fn::String) = false
 
+# whether the LLVM context this job is compiled in should use opaque pointers (`true`) or
+# typed pointers (`false`). `nothing` uses the default of the current LLVM version.
+# only relevant for LLVM 13 to 16; later versions only support opaque pointers.
+opaque_pointers(@nospecialize(job::CompilerJob)) = nothing
+
 # provide a specific interpreter to use.
 @static if HAS_INTEGRATED_CACHE
 function get_interpreter(@nospecialize(job::CompilerJob))

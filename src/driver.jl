@@ -37,6 +37,9 @@ function JuliaContext(f; kwargs...)
         dispose(ts_ctx)
     end
 end
+# create a context suitable for compiling `job`, respecting the `opaque_pointers` hook.
+JuliaContext(f, @nospecialize(job::CompilerJob); kwargs...) =
+    JuliaContext(f; opaque_pointers=opaque_pointers(job), kwargs...)
 
 
 ## compiler entrypoint

@@ -35,7 +35,7 @@ import REPL
         config = CompilerConfig(target, params; libraries=false)
         job = CompilerJob(source, config)
 
-        JuliaContext() do ctx
+        JuliaContext(job) do ctx
             GPUCompiler.compile(:asm, job)
         end
     end

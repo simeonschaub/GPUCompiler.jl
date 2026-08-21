@@ -25,6 +25,29 @@
     end
 end
 
+@testset "opaque pointers hook" begin
+    mod = @eval module $(gensym())
+        using GPUCompiler
+        import ..TestRuntime
+        struct OpaqueParams <: AbstractCompilerParams end
+        GPUCompiler.runtime_module(::CompilerJob{<:Any,OpaqueParams}) = TestRuntime
+        GPUCompiler.opaque_pointers(::CompilerJob{<:Any,OpaqueParams}) = true
+        f(x::Int) = x
+    end
+    job, _ = Native.create_job(mod.f, (Int,))
+    @test GPUCompiler.opaque_pointers(job) === nothing
+
+    source = methodinstance(typeof(mod.f), Tuple{Int})
+    config = CompilerConfig(NativeCompilerTarget(), mod.OpaqueParams(); kernel=false)
+    opaque_job = CompilerJob(source, config)
+    @test GPUCompiler.opaque_pointers(opaque_job) === true
+    JuliaContext(opaque_job) do ctx
+        @test !GPUCompiler.supports_typed_pointers(ctx)
+        ir, _ = GPUCompiler.compile(:llvm, opaque_job)
+        @test !GPUCompiler.supports_typed_pointers(context(ir))
+    end
+end
+
 @testset "method instances for type-valued callees and arguments" begin
     # JuliaLang/julia#62001: closed type-valued callees and arguments
     # dispatch on Core.TypeEgal keys instead of Type{T}
